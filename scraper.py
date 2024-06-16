@@ -108,7 +108,7 @@ class Scraper():
             else:
                 logger.info(f"waitUntilElemAppears: DONE locating elem. in attempt {n_tries+1}/{self.N_TRIES} | {by_method=} | {by_value=}")
                 return
-        logger.error(f"waitUntilElemAppears: Could NOT locate elem. in {self.N_TRIES} attempts | {by_method=} | {by_value=}")
+            logger.error(f"waitUntilElemAppears: Could NOT locate elem. in {self.N_TRIES} attempts | {by_method=} | {by_value=}")
         raise Exception(f"waitUntilElemAppears: Could NOT locate elem. in {self.N_TRIES} attempts | {by_method=} | {by_value=}")
 
 

@@ -15,6 +15,7 @@ URL = "https://facebook.com"
 N_TRIES = 5
 
 def loadEnvVars():
+    # TODO: Remove in favor of env_utils
     """
     loads FB_EMAIL, FB_PASS env vars from the .env file
     """
