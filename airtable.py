@@ -7,12 +7,6 @@ from pyairtable.formulas import match
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-"""
-todo:
-- create records
-- update records with an id(groupId_postId)
-""" 
-
 class MyAirtable():
     def __init__(self):
         vars = env_utils.loadEnvVars(['AIRTABLE_PAT', 'AIRTABLE_TABLE_NAME', 'AIRTABLE_BASE_ID']) # Get env vars
@@ -33,7 +27,7 @@ class MyAirtable():
             return 0
 
     def getAllRecords(self):
-        return self.table.all()
+        return self.table.all()    
 
 if __name__=="__main__":
     a = MyAirtable()

@@ -3,7 +3,7 @@ responsible for working with specifics related to facebook
 login, check access, navigate to groups
 """
 import logging
-logger = logging.getLogger(__name__)
+import sys
 from dotenv import load_dotenv
 from scraper import Scraper
 from selenium.webdriver.common.by import By
@@ -11,8 +11,14 @@ import os
 from bs4 import BeautifulSoup
 import time
 
+logger = logging.getLogger(__name__)
+
 URL = "https://facebook.com"
 N_TRIES = 5
+SCROLL_SLEEP = 2 # seconds to sleep after scrolling
+N_POSTS_TO_FETCH = 10
+POST_DESCRIPTION_XPATH = "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[1]/div[1]/div/div[2]/div/div/div[4]/div/div/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[13]/div/div/div[3]/div[1]"
+POST_IMAGES_XPATH = "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[1]/div[1]/div/div[2]/div/div/div[4]/div/div/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[13]/div/div/div[3]/div[2]/div[1]"
 
 def loadEnvVars():
     # TODO: Remove in favor of env_utils
@@ -48,29 +54,14 @@ def login(scraper: Scraper):
     logger.debug("login: checking access to home screen. i.e we've bypassed the security alert, etc. ")
     scraper.waitUntilElemAppears(By.XPATH, '/html/body/div[1]/div/div[1]/div/div[2]/div[3]/div/div/div/div/div/label/input', True)
 
-def scrapeGroup(scraper: Scraper, group_id: str):
+def __extractPostUrlsFromHtml(pg_src: str, group_id: str):
     """
-    Scrape the posts of the group
+    inputs: 
+        pg_src: source html
+        group_id: fb group id that we're extracting
+    outputs:
+        posts: list of unique urls
     """
-    scraper.navigateToUrl(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=RECENT_ACTIVITY") #Navigate to the page using group id
-    # Ensure that the page has loaded
-    logger.info("scrape_group: Ensuring the page has loaded by finding the 'Write something' span")
-    scraper.waitUntilElemAppears(By.XPATH, '/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[1]/div[1]/div/div[2]/div/div/div[4]/div/div[2]/div/div/div/div[1]/div/div/div/div[1]/div/div[1]/span')
-    logger.debug("scrapeGroup: going to sleep before scroll")
-    time.sleep(3)
-    logger.debug("scrapeGroup: scrolling down now")
-    # Scroll down 
-    scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(3)
-    scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(3)
-    scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(3)
-    logger.debug("scrapeGroup: fetching the page source to extract <a> tags with /groups/<group_id/posts/*")
-    # pg_src = scraper.driver.page_source # Get the source and pass it through bs4
-    pg_src = scraper.driver.execute_script("return document.documentElement.outerHTML") # Get the source and pass it through bs4
-    # with open("test.html", 'w') as f:
-    #     f.write(pg_src)
     bs = BeautifulSoup(pg_src, 'html.parser') # Parse html through bs
     a_tags = bs.find_all('a')
     posts = set()
@@ -82,10 +73,64 @@ def scrapeGroup(scraper: Scraper, group_id: str):
             parts = link.split('/')
             post_id = parts[parts.index(group_id) + 2]
             posts.add(f"https://facebook.com/groups/{group_id}/posts/{post_id}")
-    logger.info(f"scrapeGroup: found {len(posts)} unique posts")
+    return list(posts)
+
+
+def scrapeGroup(scraper: Scraper, group_id: str):
+    """
+    Scrape the posts of the group
+    """
+    scraper.navigateToUrl(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=RECENT_ACTIVITY") #Navigate to the page using group id
+    # Ensure that the page has loaded
+    logger.info("scrape_group: Ensuring the page has loaded by finding the 'Write something' span")
+    scraper.waitUntilElemAppears(By.XPATH, '/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[1]/div[1]/div/div[2]/div/div/div[4]/div/div[2]/div/div/div/div[1]/div/div/div/div[1]/div/div[1]/span')
+    logger.debug("scrapeGroup: going to sleep before scroll")
+    time.sleep(SCROLL_SLEEP)
+    while True:
+        # logger.debug("scrapeGroup: scrolling down now")
+        # Scroll down 
+        scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(SCROLL_SLEEP)
+        scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(SCROLL_SLEEP)
+        scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(SCROLL_SLEEP)
+        
+        # logger.debug("scrapeGroup: fetching the page source to extract <a> tags with /groups/<group_id/posts/*")
+        pg_src = scraper.driver.execute_script("return document.documentElement.outerHTML") # Get the source and pass it through bs4
+        posts = __extractPostUrlsFromHtml(pg_src, group_id)
+        if len(posts)>=N_POSTS_TO_FETCH:
+            break
+        logger.info(f"scrapeGroup: found only {len(posts)} unique posts, needed {N_POSTS_TO_FETCH=} posts. Scrolling down to get more posts")
+    logger.info(f"scrapeGroup: found {len(posts)}")
+    return list(posts)
+
+def scrapePostDescription(scraper: Scraper, post_url: str):
+    """
+    scrapePost scrapes the details out of the post when given the post url
+    """
+    # Todo: figure how you can scrape multiple posts together using windows + multi threading.
+    scraper.navigateToUrl(post_url)
+    scraper.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)
+    text_elem = scraper.findElemWhenVisible(By.XPATH, POST_DESCRIPTION_XPATH)
+    description = ((text_elem.text))
+    return description
 
 if __name__=="__main__":
+    # Setup logging 
+    # Defining handlers
+    handlers = []
+    # fhandler = logging.FileHandler(filename="tmp.log"); handlers.append(fhandler)
+    shandler = logging.StreamHandler(stream=sys.stdout); handlers.append(shandler)
+
+    logging.basicConfig(
+        level = logging.INFO,     
+        format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+        handlers = handlers
+    )
     ts = Scraper()
+
     ts.initDriver()
     login(ts)
+    scrapeGroup(ts,"320292845738195") 
+    # scrapePost(ts, 'https://www.facebook.com/groups/320292845738195/posts/1102757397491732/')
+
 
