@@ -1,40 +1,48 @@
 import env_utils
 import logging
 from pyairtable import Api
+import pyairtable
 from pyairtable.formulas import match
 
 # Setup logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-class MyAirtable():
+
+class MyAirtable:
     def __init__(self):
-        vars = env_utils.loadEnvVars(['AIRTABLE_PAT', 'AIRTABLE_TABLE_NAME', 'AIRTABLE_BASE_ID']) # Get env vars
-        self.connection = Api(vars['AIRTABLE_PAT'])
-        self.table = self.connection.table(vars['AIRTABLE_BASE_ID'], vars['AIRTABLE_TABLE_NAME'])
+        vars = env_utils.loadEnvVars(
+            ["AIRTABLE_PAT", "AIRTABLE_TABLE_NAME", "AIRTABLE_BASE_ID"]
+        )  # Get env vars
+        self.connection = Api(vars["AIRTABLE_PAT"])
+        self.table = self.connection.table(
+            vars["AIRTABLE_BASE_ID"], vars["AIRTABLE_TABLE_NAME"]
+        )
 
-    def insertRecord(self, group_id: str, post_id: str, record: dict):
+    def getMatchingRecords(
+        self,
+        match_formula: pyairtable.formulas.match = None,
+        fields_to_return: list = None,
+    ):
         """
-        Inserts a record into the table.
-        Returns: 1 -> successfully added. 0 -> already exists. -1 -> couldn't add the record
+        Description: getMatchingRecords return all the matching records based on the match_formula and fields_to_return
+        Input:
+            - match_formula: pyairtable.formulas.match; ref https://pyairtable.readthedocs.io/en/stable/api.html#module-pyairtable.formulas
+            - fields_to_return: list; list of columns you'd want to be returned
+        Output:
+            - Iterator[List[RecordDict]] : Note that it'd return the RecordDict
         """
-        uid = group_id + "/" + post_id
-        if(self.table.first(formula = match({'uid': uid})) is None):
-            self.table.create({"uid": uid})
-            return 1
-        else:
-            logger.info(f"insertRecord: record with {uid=} already exists")
-            return 0
+        return self.table.all(fields=fields_to_return, formula=match_formula)
 
-    def getAllRecords(self):
-        return self.table.all()    
 
-if __name__=="__main__":
+if __name__ == "__main__":
     a = MyAirtable()
-    print(a.insertRecord("abcd","123", {}))
-    print(a.getAllRecords())
-
-
-
-
-
+    # print(a.insertRecord("abcd","123", {}))
+    t = a.getMatchingRecords(
+        match_formula=match({"description": ""}), fields_to_return=["uid", "url"]
+    )
+    for x in t:
+        print(x)
+    # print(type(t))
+    # print(t)
+    # print(len(t))

@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 def loadEnvVars(keys: list):
     """
     loads env vars with keys from the .env file
@@ -15,7 +16,7 @@ def loadEnvVars(keys: list):
     vals = {}
     for key in keys:
         val = os.environ.get(key)
-        if(val==None):
+        if val == None:
             logger.error(f"load_dotenv: couldn't find {key=} in the .env file")
             raise Exception(f"load_dotenv: couldn't find {key=} in the .env file")
         else:
